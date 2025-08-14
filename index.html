@@ -277,6 +277,10 @@
             .message {
                 max-width: 90%;
             }
+            
+            #send-button {
+                padding: 0 20px;
+            }
         }
     </style>
 </head>
@@ -302,7 +306,9 @@
             </div>
             
             <div class="messages" id="messages">
-                <!-- Сообщения будут добавляться здесь -->
+                <div class="message notification">
+                    Добро пожаловать в AnonMsg! Для начала работы введите никнейм и нажмите "Подключиться"
+                </div>
             </div>
             
             <div class="input-area">
@@ -460,7 +466,7 @@
             
             messageElement.innerHTML = `
                 <div class="message-header">
-                    <span class="sender">${message.sender}</span>
+                    <span class="sender">${escapeHtml(message.sender)}</span>
                     <span class="timestamp">${timestamp}</span>
                 </div>
                 <div class="message-text">${escapeHtml(message.text)}</div>
@@ -532,6 +538,17 @@
         window.addEventListener('load', () => {
             messageInput.focus();
             scrollToBottom();
+            
+            // Автоматическое подключение при наличии параметров в URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoConnect = urlParams.get('autoconnect');
+            const autoNickname = urlParams.get('nickname');
+            
+            if (autoConnect && autoNickname) {
+                nicknameInput.value = autoNickname;
+                nickname = autoNickname;
+                connectToServer();
+            }
         });
     </script>
 </body>
