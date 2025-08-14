@@ -270,7 +270,7 @@ def run_server(host, port, web_port):
     messenger_thread.start()
     
     # Настраиваем и запускаем HTTP сервер для веб-интерфейса
-    web_server = ThreadedHTTPServer(('0.0.0.0', web_port), WebRequestHandler)
+    web_server = ThreadedHTTPServer(('127.0.0.1', web_port), WebRequestHandler)
     web_server.messenger = messenger  # Передаем ссылку на мессенджер
     web_server.allow_reuse_address = True  # Разрешаем повторное использование адреса
     
@@ -293,12 +293,12 @@ def run_server(host, port, web_port):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='AnonMsg Messenger')
-    parser.add_argument('--host', type=str, default='0.0.0.0', 
-                        help='Server host (default: 0.0.0.0)')
+    parser.add_argument('--host', type=str, default='127.0.0.1', 
+                        help='Server host (default: 127.0.0.1)')
     parser.add_argument('--port', type=int, default=65432, 
                         help='Messenger port (default: 65432)')
-    parser.add_argument('--web', type=int, default=8080, 
-                        help='Web interface port (default: 8080)')
+    parser.add_argument('--web', type=int, default=10000, 
+                        help='Web interface port (default: 10000)')
     
     args = parser.parse_args()
     
@@ -306,7 +306,7 @@ if __name__ == "__main__":
     def is_port_available(port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind(("0.0.0.0", port))
+                s.bind(("127.0.0.1", port))
                 return True
             except OSError:
                 return False
