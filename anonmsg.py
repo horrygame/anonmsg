@@ -5,6 +5,7 @@ import socket
 import threading
 import json
 import logging
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
@@ -22,6 +23,7 @@ logger = logging.getLogger('AnonMsg')
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Многопоточный HTTP сервер"""
     daemon_threads = True
+    allow_reuse_address = True  # Разрешаем повторное использование адреса
 
 class MessengerServer:
     """Сервер мессенджера AnonMsg"""
@@ -31,29 +33,62 @@ class MessengerServer:
         self.clients = {}
         self.messages = []
         self.next_id = 1
+        self.running = False
         
     def start(self):
         """Запуск сервера"""
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind((self.host, self.port))
-        self.socket.listen(10)
+        self.running = True
+        
+        # Пытаемся занять порт с повторными попытками
+        for attempt in range(5):
+            try:
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.socket.bind((self.host, self.port))
+                self.socket.listen(10)
+                break
+            except OSError as e:
+                if e.errno == 98:  # Адрес уже используется
+                    logger.warning(f"Порт {self.port} занят, попытка {attempt+1}/5")
+                    time.sleep(2)  # Ждем перед повторной попыткой
+                    if attempt == 4:
+                        logger.error(f"Не удалось занять порт {self.port} после 5 попыток")
+                        return
+                else:
+                    logger.error(f"Ошибка запуска сервера: {e}")
+                    return
         
         logger.info(f"🚀 Сервер запущен на {self.host}:{self.port}")
         logger.info("Ожидание подключений...")
         
         try:
-            while True:
-                client_socket, address = self.socket.accept()
-                threading.Thread(
-                    target=self.handle_client,
-                    args=(client_socket, address),
-                    daemon=True
-                ).start()
+            while self.running:
+                try:
+                    client_socket, address = self.socket.accept()
+                    threading.Thread(
+                        target=self.handle_client,
+                        args=(client_socket, address),
+                        daemon=True
+                    ).start()
+                except socket.error:
+                    if self.running:
+                        logger.error("Ошибка при принятии соединения")
         except KeyboardInterrupt:
             logger.info("\nСервер остановлен")
         finally:
             self.socket.close()
+            self.running = False
+    
+    def stop(self):
+        """Остановка сервера"""
+        self.running = False
+        # Создаем временное соединение чтобы выйти из accept()
+        try:
+            temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            temp_socket.connect((self.host, self.port))
+            temp_socket.close()
+        except:
+            pass
     
     def handle_client(self, client_socket, address):
         """Обработка подключения клиента"""
@@ -81,20 +116,25 @@ class MessengerServer:
             }, exclude=client_socket)
             
             # Основной цикл обработки сообщений
-            while True:
-                message = client_socket.recv(1024).decode()
-                if not message:
-                    break
-                    
+            while self.running:
                 try:
-                    data = json.loads(message)
-                    if data["type"] == "message":
-                        self.process_message(data, client_socket)
-                except:
-                    pass
+                    message = client_socket.recv(1024).decode()
+                    if not message:
+                        break
+                        
+                    try:
+                        data = json.loads(message)
+                        if data["type"] == "message":
+                            self.process_message(data, client_socket)
+                    except:
+                        pass
+                except (ConnectionResetError, BrokenPipeError):
+                    break
+                except socket.timeout:
+                    continue
                     
         except Exception as e:
-            logger.error(f"Ошибка: {e}")
+            logger.error(f"Ошибка клиента: {e}")
         finally:
             # Отключение клиента
             if client_socket in self.clients:
@@ -105,7 +145,10 @@ class MessengerServer:
                     "type": "notification",
                     "text": f"{nickname} покинул чат"
                 })
-            client_socket.close()
+            try:
+                client_socket.close()
+            except:
+                pass
     
     def process_message(self, data, sender_socket):
         """Обработка входящего сообщения"""
@@ -127,13 +170,18 @@ class MessengerServer:
     
     def broadcast(self, data, exclude=None):
         """Рассылка данных всем подключенным клиентам"""
+        if not self.running:
+            return
+            
         message = json.dumps(data)
         for client in list(self.clients.keys()):
             if client != exclude:
                 try:
                     client.send(message.encode())
                 except:
-                    pass
+                    # Удаляем нерабочих клиентов
+                    if client in self.clients:
+                        del self.clients[client]
 
 # ------------------------- HTTP сервер для веб-интерфейса -------------------------
 
@@ -218,11 +266,13 @@ def run_server(host, port, web_port):
     """Запуск сервера мессенджера и веб-интерфейса"""
     # Создаем и запускаем сервер мессенджера
     messenger = MessengerServer(host, port)
-    threading.Thread(target=messenger.start, daemon=True).start()
+    messenger_thread = threading.Thread(target=messenger.start, daemon=True)
+    messenger_thread.start()
     
     # Настраиваем и запускаем HTTP сервер для веб-интерфейса
     web_server = ThreadedHTTPServer(('0.0.0.0', web_port), WebRequestHandler)
     web_server.messenger = messenger  # Передаем ссылку на мессенджер
+    web_server.allow_reuse_address = True  # Разрешаем повторное использование адреса
     
     logger.info(f"🌐 Веб-интерфейс доступен по адресу: http://localhost:{web_port}")
     logger.info("Нажмите Ctrl+C для остановки")
@@ -230,9 +280,16 @@ def run_server(host, port, web_port):
     try:
         web_server.serve_forever()
     except KeyboardInterrupt:
-        pass
+        logger.info("Получен сигнал остановки")
     finally:
+        # Корректно останавливаем сервер
+        logger.info("Останавливаем сервер мессенджера...")
+        messenger.stop()
+        messenger_thread.join(timeout=5)
+        
+        logger.info("Останавливаем веб-сервер...")
         web_server.server_close()
+        logger.info("Серверы остановлены")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='AnonMsg Messenger')
@@ -244,5 +301,22 @@ if __name__ == "__main__":
                         help='Web interface port (default: 8080)')
     
     args = parser.parse_args()
+    
+    # Проверяем доступность портов
+    def is_port_available(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("0.0.0.0", port))
+                return True
+            except OSError:
+                return False
+    
+    if not is_port_available(args.port):
+        logger.error(f"Порт {args.port} для мессенджера недоступен!")
+        sys.exit(1)
+    
+    if not is_port_available(args.web):
+        logger.error(f"Порт {args.web} для веб-интерфейса недоступен!")
+        sys.exit(1)
     
     run_server(args.host, args.port, args.web)
