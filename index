@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnonMsg - Анонимный мессенджер</title>
+    <style>
+        :root {
+            --primary: #6a11cb;
+            --secondary: #2575fc;
+            --dark: #1a1a2e;
+            --light: #f0f0f0;
+            --success: #4caf50;
+            --danger: #f44336;
+            --gray: #9e9e9e;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        
+        .tagline {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--gray);
+        }
+        
+        .status.connected .status-indicator {
+            background: var(--success);
+        }
+        
+        .status-text {
+            font-size: 0.9rem;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.received {
+            align-self: flex-start;
+            background: #e9ecef;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message.sent {
+            align-self: flex-end;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.notification {
+            align-self: center;
+            background: #e9f5ff;
+            color: #0d6efd;
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            border-radius: 12px;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+        }
+        
+        .sender {
+            font-weight: bold;
+        }
+        
+        .timestamp {
+            opacity: 0.7;
+            font-size: 0.8rem;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #message-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e9ecef;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        #message-input:focus {
+            border-color: var(--primary);
+        }
+        
+        #send-button {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 0 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        #send-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(106, 17, 203, 0.3);
+        }
+        
+        #send-button:active {
+            transform: translateY(0);
+        }
+        
+        .connection-panel {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        #nickname-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+        }
+        
+        #connect-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 10px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        #connect-button.disconnected {
+            background: #dc3545;
+        }
+        
+        .notification {
+            background: #e9f5ff;
+            color: #0d6efd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 15px;
+            color: #6c757d;
+            font-size: 0.9rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            header {
+                padding: 15px;
+            }
+            
+            .logo {
+                font-size: 2rem;
+            }
+            
+            .chat-container {
+                padding: 15px;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">AnonMsg</div>
+            <div class="tagline">Анонимный мессенджер без регистрации</div>
+            <div class="status" id="status">
+                <div class="status-indicator"></div>
+                <span class="status-text">Не подключено</span>
+            </div>
+        </header>
+        
+        <div class="chat-container">
+            <div class="notification" id="notification">
+                Введите никнейм и подключитесь к серверу
+            </div>
+            
+            <div class="connection-panel">
+                <input type="text" id="nickname-input" placeholder="Ваш никнейм..." maxlength="20">
+                <button id="connect-button">Подключиться</button>
+            </div>
+            
+            <div class="messages" id="messages">
+                <!-- Сообщения будут добавляться здесь -->
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
+                <button id="send-button" disabled>Отправить</button>
+            </div>
+        </div>
+        
+        <footer>
+            AnonMsg &copy; 2023 | Сообщения шифруются при передаче
+        </footer>
+    </div>
+    
+    <script>
+        // Элементы интерфейса
+        const statusElement = document.getElementById('status');
+        const statusText = statusElement.querySelector('.status-text');
+        const statusIndicator = statusElement.querySelector('.status-indicator');
+        const notificationElement = document.getElementById('notification');
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const nicknameInput = document.getElementById('nickname-input');
+        const connectButton = document.getElementById('connect-button');
+        
+        // Переменные состояния
+        let socket = null;
+        let nickname = '';
+        let lastMessageId = 0;
+        
+        // Подключение к серверу
+        function connectToServer() {
+            if (nickname.trim() === '') {
+                showNotification('Введите никнейм!', 'error');
+                return;
+            }
+            
+            // Закрываем предыдущее соединение, если есть
+            if (socket) {
+                socket.close();
+            }
+            
+            // Создаем новое подключение
+            const serverHost = window.location.hostname;
+            const serverPort = 65432; // Порт по умолчанию
+            
+            socket = new WebSocket(`ws://${serverHost}:${serverPort}`);
+            
+            // Обработчики событий WebSocket
+            socket.onopen = () => {
+                updateStatus(true);
+                showNotification('Успешное подключение!');
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                nicknameInput.disabled = true;
+                connectButton.textContent = 'Отключиться';
+                connectButton.classList.add('disconnected');
+                
+                // Отправляем серверу никнейм
+                socket.send(nickname);
+            };
+            
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'history') {
+                        // Обработка истории сообщений
+                        data.messages.forEach(message => {
+                            addMessageToChat(message);
+                            lastMessageId = Math.max(lastMessageId, message.id);
+                        });
+                    } else if (data.type === 'message') {
+                        // Обработка нового сообщения
+                        addMessageToChat(data.message);
+                        lastMessageId = Math.max(lastMessageId, data.message.id);
+                    } else if (data.type === 'notification') {
+                        // Обработка уведомления
+                        addNotification(data.text);
+                    }
+                } catch (e) {
+                    console.error('Ошибка обработки сообщения:', e);
+                }
+            };
+            
+            socket.onclose = () => {
+                updateStatus(false);
+                showNotification('Соединение с сервером потеряно', 'error');
+                sendButton.disabled = true;
+                messageInput.disabled = true;
+                connectButton.textContent = 'Подключиться';
+                connectButton.classList.remove('disconnected');
+                nicknameInput.disabled = false;
+                socket = null;
+            };
+            
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                showNotification('Ошибка подключения', 'error');
+            };
+        }
+        
+        // Отключение от сервера
+        function disconnectFromServer() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+        
+        // Обновление статуса подключения
+        function updateStatus(connected) {
+            if (connected) {
+                statusText.textContent = 'Подключено';
+                statusIndicator.style.backgroundColor = 'var(--success)';
+                statusElement.classList.add('connected');
+            } else {
+                statusText.textContent = 'Не подключено';
+                statusIndicator.style.backgroundColor = 'var(--gray)';
+                statusElement.classList.remove('connected');
+            }
+        }
+        
+        // Показать уведомление
+        function showNotification(text, type = 'info') {
+            notificationElement.textContent = text;
+            notificationElement.style.display = 'block';
+            
+            if (type === 'error') {
+                notificationElement.style.backgroundColor = '#f8d7da';
+                notificationElement.style.color = '#721c24';
+            } else {
+                notificationElement.style.backgroundColor = '#d1ecf1';
+                notificationElement.style.color = '#0c5460';
+            }
+            
+            // Автоматически скрыть через 5 секунд
+            setTimeout(() => {
+                notificationElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Добавить сообщение в чат
+        function addMessageToChat(message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            
+            if (message.sender === nickname) {
+                messageElement.classList.add('sent');
+            } else {
+                messageElement.classList.add('received');
+            }
+            
+            const timestamp = new Date(message.timestamp).toLocaleTimeString();
+            
+            messageElement.innerHTML = `
+                <div class="message-header">
+                    <span class="sender">${message.sender}</span>
+                    <span class="timestamp">${timestamp}</span>
+                </div>
+                <div class="message-text">${escapeHtml(message.text)}</div>
+            `;
+            
+            messagesContainer.appendChild(messageElement);
+            scrollToBottom();
+        }
+        
+        // Добавить уведомление
+        function addNotification(text) {
+            const notificationElement = document.createElement('div');
+            notificationElement.classList.add('message', 'notification');
+            notificationElement.textContent = text;
+            messagesContainer.appendChild(notificationElement);
+            scrollToBottom();
+        }
+        
+        // Отправка сообщения
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !socket) return;
+            
+            const message = {
+                type: "message",
+                text: text,
+                timestamp: Date.now()
+            };
+            
+            socket.send(JSON.stringify(message));
+            messageInput.value = '';
+            messageInput.focus();
+        }
+        
+        // Прокрутка вниз
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Экранирование HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Обработчики событий
+        connectButton.addEventListener('click', () => {
+            if (connectButton.textContent === 'Подключиться') {
+                nickname = nicknameInput.value.trim();
+                connectToServer();
+            } else {
+                disconnectFromServer();
+            }
+        });
+        
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // При загрузке страницы
+        window.addEventListener('load', () => {
+            messageInput.focus();
+            scrollToBottom();
+        });
+    </script>
+</body>
+</html>
