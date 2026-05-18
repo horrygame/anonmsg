@@ -2,14 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>База данных</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #333; padding: 8px; }
-        th { background-color: #f2f2f2; }
-        button { margin-top: 10px; padding: 8px 12px; }
-    </style>
+    <title>База данных на Render</title>
 </head>
 <body>
     <h1>База данных</h1>
@@ -20,51 +13,50 @@
     </form>
 
     <h2>Записи</h2>
-    <table id="recordsTable">
-        <thead>
-            <tr>
-                <th>Имя</th>
-                <th>Телефон</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Записи будут добавляться сюда -->
-        </tbody>
+    <table id="recordsTable" border="1">
+        <thead><tr><th>Имя</th><th>Телефон</th></tr></thead>
+        <tbody></tbody>
     </table>
 
     <button onclick="downloadJSON()">Скачать базу данных (JSON)</button>
 
     <script>
-        let records = [];
-
-        document.getElementById('dataForm').onsubmit = function(e) {
-            e.preventDefault();
-            const name = document.getElementById('name').value;
-            const phone = document.getElementById('phone').value;
-            records.push({name, phone});
-            renderTable();
-            this.reset();
-        };
-
-        function renderTable() {
+        async function loadRecords() {
+            const res = await fetch('/api/records');
+            const records = await res.json();
             const tbody = document.querySelector('#recordsTable tbody');
             tbody.innerHTML = '';
-            records.forEach((rec, i) => {
+            records.forEach(r => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>${rec.name}</td><td>${rec.phone}</td>`;
+                row.innerHTML = `<td>${r.name}</td><td>${r.phone}</td>`;
                 tbody.appendChild(row);
             });
         }
 
-        function downloadJSON() {
+        document.getElementById('dataForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            await fetch('/api/records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone })
+            });
+            loadRecords();
+            this.reset();
+        };
+
+        async function downloadJSON() {
+            const res = await fetch('/api/records');
+            const records = await res.json();
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "database.json");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", "database.json");
+            a.click();
         }
+
+        loadRecords();
     </script>
 </body>
 </html>
